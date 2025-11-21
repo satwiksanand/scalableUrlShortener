@@ -1,0 +1,2 @@
+spring.application.name=scalableUrlShortener
+spring.data.mongodb.uri=your mongodb uri here.
