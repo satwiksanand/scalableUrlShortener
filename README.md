@@ -17,3 +17,36 @@ let's talk about scale requirements
 - write requests per day: 1M
 - assuming that each entry is 500 bytes.
 
+## API Endpoints:
+
+1. URL shortening endpoint:
+    
+    POST api/v1/shorten
+
+    This endpoint accepts a long URL and returns a shortened version.
+    
+    Request body:
+    ```txt
+    {
+        "longUrl": "your long url here"
+    }
+   ```
+
+   Request body:
+    ```txt
+    {
+        "shortUrl": "you will recieve your short url in the response"
+    }
+
+2. URL redirection
+
+    GET api/v1/urls/{shortUlr}
+
+    redirect to the original url
+
+    Response body:
+
+    ```
+   {
+        "longUrl": "your long url here"
+    }
