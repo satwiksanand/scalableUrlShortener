@@ -26,18 +26,19 @@ let's talk about scale requirements
     This endpoint accepts a long URL and returns a shortened version.
     
     Request body:
-    ```txt
+    ```json
     {
         "longUrl": "your long url here"
     }
    ```
 
    Request body:
-    ```txt
+    ```json
     {
         "shortUrl": "you will recieve your short url in the response",
         "longUrl": "the original long url that you posted"
     }
+    ```
 
 2. URL redirection
 
@@ -47,10 +48,11 @@ let's talk about scale requirements
 
     Response body:
 
-    ```
+    ```json
    {
         "longUrl": "your long url here"
     }
+    ```
 
 ## High Level Design
 
