@@ -14,7 +14,7 @@ public class RateLimiterServiceImpl implements RateLimiterService {
     private final StringRedisTemplate redisTemplate;
 
     private static final int WINDOW_SIZE_SECONDS = 60;
-    private static final int MAX_REQUESTS = 1;
+    private static final int MAX_REQUESTS = 20;
 
     public boolean isAllowed(String ipAddress) {
         String key = "rate:" + ipAddress;

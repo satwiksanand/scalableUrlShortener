@@ -17,12 +17,15 @@ public class UrlController {
     }
 
     @GetMapping("urls/{shortUrl}")
-    public ResponseEntity<RedirectResponse> redirectResponse(@PathVariable String shortUrl) throws Exception {
-        return ResponseEntity.status(HttpStatus.MOVED_PERMANENTLY).body(urlService.redirectUrl(shortUrl));
+    public ResponseEntity<Void> redirectResponse(@PathVariable String shortUrl) throws Exception {
+        RedirectResponse response = urlService.redirectUrl(shortUrl);
+        return ResponseEntity.status(HttpStatus.FOUND)
+                .location(java.net.URI.create(response.getLongUrl()))
+                .build();
     }
 
     @PostMapping("shorten")
-    public ResponseEntity<ShortenResponse> shortenResponse(@RequestBody ShortenResponse resp){
+    public ResponseEntity<ShortenResponse> shortenResponse(@RequestBody ShortenResponse resp) {
         return ResponseEntity.ok(urlService.shortenUrl(resp.getLongUrl()));
     }
 }
