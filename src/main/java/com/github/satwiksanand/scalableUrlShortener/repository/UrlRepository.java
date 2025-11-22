@@ -10,4 +10,6 @@ public interface UrlRepository extends MongoRepository<Urls, String> {
     boolean existsByShortUrl(String shortUrl);
 
     Optional<Urls> findByShortUrl(String shortUrl);
+
+    Optional<Urls> findByLongUrl(String longUrl);
 }
