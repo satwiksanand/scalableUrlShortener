@@ -12,7 +12,6 @@ some other things that i want to talk about - to be implemented in the future.
 - analytics to measure site engagement.
 
 let's talk about scale requirements
-- daily active users: 100M
 - read:write ratio: 100:1
 - write requests per day: 1M
 - assuming that each entry is 500 bytes.
@@ -48,10 +47,8 @@ let's talk about scale requirements
 
     Response body:
 
-    ```json
-   {
-        "longUrl": "your long url here"
-    }
+    ```md
+         Returns HTTP 302 with the "Location" header set to the original URL.
     ```
 
 ## High Level Design
@@ -87,7 +84,7 @@ let's talk about some stuff first and then i will continue with scalability.
 ### What are the properties of shortUrl and how can we generate it.
 the short url should be unique and should be as short as possible.
 
-for our use case we are assuming that the system will receive 100M write requests per day, assuming that the data is persisted for 10years, the total number of entries our database should be able to store is 100M * 365 * 10 which is 365B shortUrls.
+for our use case we are assuming that the system will receive 1M write requests per day, assuming that the data is persisted for 10years, the total number of entries our database should be able to store is 1M * 365 * 10 which is 3.65B shortUrls.
 
 let's assume we are using Base 62 characters for creating short urls, in that case the short url should be of at least 7 characters which is capable of storing around 3T entries.
 
@@ -134,5 +131,44 @@ let's assume we are using Base 62 characters for creating short urls, in that ca
 4. Random Slug
     Another approach is to generate slug randomly, in case a collision happens we can just generate it again until we get a new unused slug
     the probability of collision though is very low.
+
+#### How do we scale the system?
+
+for scaling we need to identify the bottleneck of the system, in our case that would be
+1. database -> we have 3.65B records in a year, one instance of database might struggle with it.
+2. database lookups -> we have around 100M read operations per day, we have to ensure that the system can support this high traffic with minimal latency.
+
+the scaling portion will revolve around the above two
+
+##### Scaling our Database
+1. scaling for write operations
+    Since we are dealing with billions of rows, a single instance of database might struggle with disk-space and IOPS(Input/Output operations per second), so a better way is to shard the database reducing request overload
+    
+    we have to design the database in such a way that it supports 1M write operations a day that is around 12 write operations per second, which is not a lot, but the request distribution is not uniform and during rush hours we can get 10X
+    more write operations, so we need to be prepared for that.
+    
+    we can use hash-based sharding, we hash the short url for our application and as to why short url and not long url is because the read operation is `GET: api/v1/urls/{shortUrl}`, so we will need to query all the shards of the database, which will be tough
+    
+    to determine which shard we should write we can use consistent hashing (will try to implement it next), basically what happens is that we hash the short url and find the nearest shard key while traveling in a clockwise directions on the hash search space.
+    
+    with this our database should be able to handle the required amount of write operations.
+
+2. scaling for read operations
+
+    the number of read operations are much larger than the number of write operations, in a second we have to deal with around 1200 read operations, which can be as big as 12000 during rush hours.
+    
+    we can use database replication(Master-Slave), since the number of read requests in larger compared to write requests we separate reads and writes, the Master database handle all the write operations and the slave database handles all the read operations
+    
+    apart from that we can also use caching, database operations are heavy, we can use caching to avoid querying the database for all the read requests.
+    
+    we can have a cache that stores the data in the form of <shortUrl, longUrl> mapping, we can use the cache-aside policy(check the cache first, if not present check the database and update cache) and eviction policy like LRU for our use case.
+    
+    if we have 100M request and cache 20% of the requests, then 20M * 500bytes = 10GB, this is easily manageable on a single instance but we use multiple for resilience.
+    
+    **not needed** for our system but something that i wanted to talk about: what will we do if say some bot generates millions of read requests with random shortUrl, our system will
+    go something like this cache -> miss -> check database -> miss, which can overwhelm our system, how do we fix this, we can use bloom-filters for this, a bloom filter is a probabilistic memory structure that tells 
+    us if a url is **possibly present** or **absolute not present**, if the bloom filter says that the url is absolutely not present we can straight up reject the request, safe-guarding our system in such case.
+
+
 
 
