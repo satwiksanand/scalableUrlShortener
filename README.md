@@ -82,3 +82,57 @@ the high level diagram has four main components:
 - **database**: in case the url is not found in the cache, then look for it in the database.
 
 ## High level deep dive:
+let's talk about some stuff first and then i will continue with scalability.
+
+### What are the properties of shortUrl and how can we generate it.
+the short url should be unique and should be as short as possible.
+
+for our use case we are assuming that the system will receive 100M write requests per day, assuming that the data is persisted for 10years, the total number of entries our database should be able to store is 100M * 365 * 10 which is 365B shortUrls.
+
+let's assume we are using Base 62 characters for creating short urls, in that case the short url should be of at least 7 characters which is capable of storing around 3T entries.
+
+#### How should we generate short urls?
+1. Using auto-increment integer id generation
+    we can use integer id's to generate short urls.    
+    
+    we can use the auto-increment integer id feature of the databases to generate unique integer id which then can be used to generate the corresponding short url,
+    although this won't work if we shard the database, so the best option is to use a global id generator.
+    
+    the easiest way to use a global generator is to use a redis server for id generation, since redis is single threaded by nature we won't even have to worry about synchronization,
+    although it introduces a single-point-of-failure in our system, so we might want to fix it.
+    
+    we can have more than one redis servers, in which the possibility of all redis server going down at once is reduced, 
+    but how do we get all these redis server to agree to a "current" id, we can use step/offset strategy like the ticket-server pattern for this.
+    
+    Instead of having multiple servers try to agree on the "current" number (which is hard), you assign them different starting points and a step size equal to the count of servers.
+    
+    If you have 2 Redis Servers:
+    
+    - Redis A: Starts at 1, increments by 2. (Generates: 1, 3, 5, 7...)
+    - Redis B: Starts at 2, increments by 2. (Generates: 2, 4, 6, 8...)
+        
+    next we can use batching, to avoid hitting the redis server every time a request arrives.
+    
+    Even with the strategy above, hitting Redis for every single URL creation is slow (network latency). A standard industry optimization is Batching.
+    
+    - Your Application Server (Web Server) asks Redis: "Give me a range of 1,000 IDs."
+    - Redis does INCRBY counter 1000 and returns the value (e.g., 50,000).
+    - The Application Server now knows it "owns" IDs 49,001 to 50,000.
+    - It assigns these IDs in memory to incoming requests without talking to Redis again until it runs out.
+    
+    with these strategies we can generate integer id, which increase by a certain amount (+1), and use it to generate short url.
+
+2. Distributed unique integer id (Twitter snowflake)
+   Generate a globally unique 64/128-bit ID per request using a time+worker scheme and then encode in base62.
+
+    we can use Twitter snowflake strategy for that -> timestamp | datacenter | machine | sequence
+
+3. Hash based short url generation
+    In this technique we use hash algorithms like SHA-256/MD5 to hash a long url and then we take the first L(length of the short url required) characters
+    if collision occurs we can keep adding salt until we finally get a unused short url.
+
+4. Random Slug
+    Another approach is to generate slug randomly, in case a collision happens we can just generate it again until we get a new unused slug
+    the probability of collision though is very low.
+
+
